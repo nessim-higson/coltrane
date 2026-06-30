@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "coltrane",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd /Users/nessimhigson/CLAUDE/projects/coltrane && python3 -m http.server 4197"],
+      "port": 4197
+    }
+  ]
+}
