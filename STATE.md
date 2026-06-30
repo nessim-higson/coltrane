@@ -19,7 +19,22 @@ side**. Generative Web Audio, IAAH imagery, a tempo fader, mode switches.
 
 ---
 
-## The two builds
+## The builds
+
+### breathe-only/  (the breath, focused + enhanced)
+The breathe direction on its own — mode locked to breathe, the subdivide/repack chips
+gone. The grid breathes with the music and **the movement comes from a different place
+each beat**, cycling through enabled **gestures** (toggle chips, keys 1–4):
+- **CROSS** — the firing block bulges (its column + row swell ×1.5/1.45); source moves
+  with the voice→block binding.
+- **INHALE** — the whole grid breathes in together (×1.16); the communal breath.
+- **BAND** — a full row swells (×1.6), cycling rows; a horizontal band.
+- **WAVE** — the breath travels left→right across the columns (×1.6, staggered).
+Bigger amplitude + fast-in / slow-out easing than the original r50 breath. The breath
+engine cycles only the *enabled* gestures (round-robin), so you dial where the motion
+comes from. (`doBreathe` + `breathTimers`/`gridTo`/`breathRelease`.)
+
+## The base builds (forked from uniqlock-v2)
 
 ### breathe/  (forked from uniqlock-v2 · r50-crna-css)
 Three modes — **subdivide / repack / breathe**. The signature is BREATHE: on each
