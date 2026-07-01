@@ -28,19 +28,27 @@ side**. Generative Web Audio, IAAH imagery, a tempo fader, mode switches.
 
 ## The builds
 
-### movement-v2/  ★ the shader cut (V.2) — the image is the instrument
+### movement-v2/  ★ the shader cut (V.2) — image-forward, the track moves *through* the frame
 The **shader treatment** the V.a build was missing. Same generative six-movement track + lookahead
-scheduler, but the visual is a single **Three.js fullscreen quad + ShaderMaterial** with a **ping-pong
-feedback** buffer. The music drives the pixels directly:
-- **Bass / kick → domain-warp** — the low end noise-warps the UVs, so the image breathes and heaves.
-- **Highs / kick → chromatic split** — R/G/B sampled along diverging offsets; the drop rainbows the edges.
-- **Warp-dissolve morph** — images don't crossfade, they *melt* into each other through a noise threshold
-  (`uMix` swept 0→1; hard-cut on kicks in DROP/CLIMAX, slow melt in INTRO/BREAKDOWN).
-- **Per-movement look** (CPU-set uniforms): INTRO/BREAKDOWN posterize + desaturate (graphic, few tones),
-  GROOVE/BUILD full colour, DROP heavy **feedback trails**, CLIMAX adds a **kaleidoscope fold**.
+scheduler, but the visual is a single **Three.js fullscreen quad + ShaderMaterial** (single pass,
+straight to screen — no feedback/ping-pong). The guiding rule after the first pass over-cooked it:
+**the image stays sharp; the effects are subtle musical accents, never abstraction.**
+- **Bass / kick → heave** — a gentle whole-frame zoom-breath on the low end + a small low-freq domain
+  drift. Tuned small (heave ≤ ~0.03, warp UV ≤ ~0.02) so it breathes, not smears.
+- **Highs / kick → chromatic split** — R/G/B sampled a few px apart along the radius; opens on the beat,
+  peaks at DROP/CLIMAX as tasteful print-misregistration (not rainbow).
+- **Anchored crossfade morph** — a clean crossfade whose edge wobbles organically *mid*-transition but
+  resolves to exactly one crisp image at rest (`edge = 1-|2·uMix-1|` → 0 at both ends). Hard-cut on
+  kicks in DROP/CLIMAX (~90ms), slow melt in INTRO/BREAKDOWN (~700ms).
+- **Per-movement look** (CPU-set uniforms `uSat/uPost/uWarp/uChroma`): INTRO crisp + calm, GROOVE/BUILD
+  full colour + faster cuts, DROP heavy chroma + hard cuts, **BREAKDOWN clean B&W posterize** (sat 0,
+  4-level — the graphic risograph beat), CLIMAX max chroma + warp, rapid cuts. No kaleidoscope, no trails.
 - AnalyserNode (fftSize 128) → live `uBass`/`uHigh`; kicks fire a decaying `uKick` impulse.
-- Three r0.160 from CDN; imagery loaded as `THREE.Texture`, cover-fit in-shader by aspect uniform.
-- **Verified:** runs the full arc INTRO→…→CLIMAX, no GL/console errors; climax = kaleido + chromatic + trails.
+- Three r0.160 from CDN; imagery as `THREE.Texture` (mipmaps + anisotropy), cover-fit in-shader by AR.
+- **Verified:** full arc INTRO→…→CLIMAX, no GL/console errors; every movement stays legible + sharp.
+- First pass (v04) was rebuilt in v05 — it had `max()` feedback smear + a permanent double-exposure
+  (the dissolve blend didn't resolve to one image) + posterize/desaturate mud + a psychedelic kaleido
+  climax. All removed; the anchored-crossfade + restraint fixes are the current build.
 
 ### movement/  the original cut (V.a) — a piece that performs itself
 The reframe: **the conductor is the track, not a metronome.** Press play and a developing
