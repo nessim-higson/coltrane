@@ -33,16 +33,19 @@ The **shader treatment** the V.a build was missing. Same generative six-movement
 scheduler, but the visual is a single **Three.js fullscreen quad + ShaderMaterial** (single pass,
 straight to screen — no feedback/ping-pong). The guiding rule after the first pass over-cooked it:
 **the image stays sharp; the effects are subtle musical accents, never abstraction.**
-- **Bass / kick → heave** — a gentle whole-frame zoom-breath on the low end + a small low-freq domain
-  drift. Tuned small (heave ≤ ~0.03, warp UV ≤ ~0.02) so it breathes, not smears.
-- **Highs / kick → chromatic split** — R/G/B sampled a few px apart along the radius; opens on the beat,
-  peaks at DROP/CLIMAX as tasteful print-misregistration (not rainbow).
+- The reactive vocabulary is **photographic, not glitchy** — after the chromatic aberration + noise
+  heat-haze warp read as cheesy (the generic-visualizer tell), both were pulled. What drives the pixels:
+- **Bass / kick → optical breath** — a clean, *uniform* radial scale pulse (`uBreath`). No noise, no
+  wobble. FILL zooms in; FIT/AMBIENT ease outward so the frame never crops.
+- **Kick → contrast snap** — a photographic punch: baseline contrast (`uCon`, per-section) + a decaying
+  `uKick*0.28` on every kick. The image *snaps* on the beat instead of distorting.
 - **Anchored crossfade morph** — a clean crossfade whose edge wobbles organically *mid*-transition but
   resolves to exactly one crisp image at rest (`edge = 1-|2·uMix-1|` → 0 at both ends). Hard-cut on
   kicks in DROP/CLIMAX (~90ms), slow melt in INTRO/BREAKDOWN (~700ms).
-- **Per-movement look** (CPU-set uniforms `uSat/uPost/uWarp/uChroma`): INTRO crisp + calm, GROOVE/BUILD
-  full colour + faster cuts, DROP heavy chroma + hard cuts, **BREAKDOWN clean B&W posterize** (sat 0,
-  4-level — the graphic risograph beat), CLIMAX max chroma + warp, rapid cuts. No kaleidoscope, no trails.
+- **Per-movement look** (CPU-set uniforms `uSat/uCon/uBreath/uDuo`): INTRO crisp + calm, GROOVE/BUILD
+  full colour + rising contrast + faster cuts, DROP punchy contrast + hard cuts, **BREAKDOWN clean
+  ink/paper duotone** (`uDuo` — luminance → #0a…#f5 soft-threshold, not a chunky posterize), CLIMAX
+  max contrast + breath, rapid cuts. No chromatic split, no warp, no kaleidoscope, no trails.
 - **Fit toggle** (chip bottom-right / key `F`) — **FIT** (uncropped, whole image on near-black, the
   default), **AMBIENT** (uncropped over a dark blurred cover-fill of the same image — full-bleed, no
   hard bars), **FILL** (cover/crop, the original full-bleed). In fit modes the bass heave breathes the
