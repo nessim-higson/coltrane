@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Coltrane — Movement</title>
+<style>
+  :root { --accent: #ffd23e; --black: #060606; --amp: 0; --grain: 0.05; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--black);
+    font-family: "Helvetica Neue", Helvetica, sans-serif; color: #fff; }
+  ::selection { background: var(--accent); color: #1a1500; }
+
+  #stage { position: fixed; inset: 0; background: #000; overflow: hidden; }
+  /* the field: up to three panels, conducted by the track */
+  #pw { position: absolute; inset: 0; display: flex; gap: 0;
+    transform: scale(calc(1 + var(--amp) * 0.05)); transition: transform 90ms linear; will-change: transform; }
+  .panel { position: relative; flex: 1 1 0; min-width: 0; height: 100%; overflow: hidden; background: #000; }
+  .panel .inner { position: absolute; inset: 0; transform-origin: center; will-change: transform; }
+  .panel img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0;
+    transition: opacity .5s ease; backface-visibility: hidden; }
+  /* treatments per movement — the track sets #stage's class */
+  #stage.dim   #pw { filter: brightness(.5) saturate(.7) contrast(.95); }
+  #stage.groove #pw { filter: brightness(.86) saturate(.96); }
+  #stage.build #pw { filter: brightness(calc(.86 + var(--amp) * .35)) saturate(1.05) contrast(1.02); }
+  #stage.drop  #pw { filter: brightness(1.08) contrast(1.12) saturate(1.08); }
+  #stage.break #pw { filter: brightness(.5) saturate(.12) contrast(1.05); }
+  #stage.climax #pw { filter: brightness(calc(1.02 + var(--amp) * .25)) contrast(1.16) saturate(1.1); }
+  #pw { transition: transform 90ms linear, filter .8s ease; }
+
+  #grain { position: fixed; inset: -20%; z-index: 3; pointer-events: none; opacity: var(--grain);
+    mix-blend-mode: overlay; background-repeat: repeat;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  #vig { position: fixed; inset: 0; z-index: 4; pointer-events: none;
+    background: radial-gradient(120% 120% at 50% 50%, transparent 55%, rgba(0,0,0,0.55) 100%); }
+
+  #hud { position: fixed; left: 0; right: 0; top: 0; z-index: 6; padding: 3.2vmin 4vw; display: flex;
+    align-items: center; justify-content: space-between; mix-blend-mode: difference; pointer-events: none; }
+  #hud .mark { font-size: 12px; letter-spacing: 0.34em; font-weight: 700; }
+  #sec { font-size: 12px; letter-spacing: 0.28em; font-weight: 700; opacity: 0.9; }
+  #bar { position: fixed; left: 0; bottom: 0; height: 2px; background: var(--accent); width: 0%; z-index: 6;
+    transition: width .12s linear; }
+
+  #ov { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3vmin; background: var(--black); cursor: pointer; transition: opacity .6s ease; padding: 8vw; text-align: center; }
+  #ov.leaving { opacity: 0; pointer-events: none; }
+  #ov .wm { font-size: 9vmin; font-weight: 800; letter-spacing: 0.02em; }
+  #ov .pl { font-size: 2.4vmin; opacity: 0.55; letter-spacing: 0.14em; }
+  #ov .pl b { color: var(--accent); font-weight: 700; }
+  #replay { position: fixed; left: 50%; bottom: 5vh; transform: translateX(-50%); z-index: 7; display: none;
+    font-size: 12px; letter-spacing: 0.2em; color: #fff; opacity: 0.7; cursor: pointer; border: 1px solid rgba(255,255,255,.4);
+    padding: 10px 20px; border-radius: 30px; }
+  #back { position: fixed; left: 4vw; bottom: 3.2vh; z-index: 6; font-size: 11px; letter-spacing: 0.14em; mix-blend-mode: difference; }
+  #back a { color: #fff; }
+  @media (max-width: 640px){ #hud .mark,#sec{font-size:11px} #ov .pl{font-size:3.6vmin} }
+</style>
+</head>
+<body>
+<div id="stage" class="dim">
+  <div id="pw">
+    <div class="panel"><div class="inner"><img><img></div></div>
+    <div class="panel"><div class="inner"><img><img></div></div>
+    <div class="panel"><div class="inner"><img><img></div></div>
+  </div>
+</div>
+<div id="grain"></div>
+<div id="vig"></div>
+<div id="hud"><div class="mark">COLTRANE</div><div id="sec">—</div></div>
+<div id="bar"></div>
+<div id="back"><a href="../">back</a></div>
+<div id="replay">↻ play again</div>
+
+<div id="ov">
+  <div class="wm">MOVEMENT</div>
+  <div class="pl">a piece in six movements — sound becomes image.<br>press <b>play</b>. sound on.</div>
+  <div class="pl" style="opacity:.4">tap to begin</div>
+</div>
+
+<script type="module">
+import { loadImageryManifest } from '../js/data.js';
+
+// ── imagery ──
+let pool = [], queue = [], recent = [];
+function nextImg() {
+  if (!pool.length) return '';
+  if (!queue.length) { queue = [...pool]; for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; } }
+  let u = queue.pop(); let guard = 0; while (recent.includes(u) && queue.length && guard++ < 6) { queue.unshift(u); u = queue.pop(); }
+  recent.push(u); if (recent.length > 6) recent.shift(); return u;
+}
+const manifestReady = loadImageryManifest().then((p) => { pool = p; pool.forEach((u) => { const im = new Image(); im.src = u; }); return p; }).catch(() => { pool = []; });
+
+// ── panels (the field) ──
+const stage = document.getElementById('stage'), pw = document.getElementById('pw');
+const panels = [...document.querySelectorAll('.panel')].map((el) => {
+  const imgs = [...el.querySelectorAll('img')];
+  return { el, inner: el.querySelector('.inner'), layers: imgs, front: 0 };
+});
+function showPanels(n) { panels.forEach((p, i) => { p.el.style.display = i < n ? '' : 'none'; }); }
+function punch(p, amt) {
+  p.inner.style.transition = 'none'; p.inner.style.transform = `scale(${amt})`;
+  requestAnimationFrame(() => requestAnimationFrame(() => { p.inner.style.transition = 'transform .5s cubic-bezier(.2,.7,.3,1)'; p.inner.style.transform = 'scale(1)'; }));
+}
+function cut(p, hard, punchAmt) {
+  const u = nextImg(); if (!u) return;
+  const f = p.front, bk = 1 - f, back = p.layers[bk], front = p.layers[f];
+  back.src = u;
+  if (hard) { back.style.transition = 'none'; back.style.opacity = '1'; void back.offsetWidth; front.style.opacity = '0'; }
+  else { back.style.transition = 'opacity .55s ease'; back.style.opacity = '0'; void back.offsetWidth; back.style.opacity = '1'; setTimeout(() => { front.style.opacity = '0'; }, 560); }
+  p.front = bk;
+  if (punchAmt) punch(p, punchAmt);
+}
+function cutAll(hard, punchAmt) { panels.forEach((p, i) => { if (p.el.style.display !== 'none') setTimeout(() => cut(p, hard, punchAmt), i * 40); }); }
+function initImages() { panels.forEach((p) => { p.layers[0].src = nextImg(); p.layers[0].style.opacity = '1'; }); }
+
+// ── audio ──
+let ctx, master, verb, comp, ana, anaData, NB;
+function makeIR(sec) { const len = ctx.sampleRate * sec, b = ctx.createBuffer(2, len, ctx.sampleRate); for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.4); } return b; }
+function env(g, t, a, d, peak) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + d); }
+function kick(t) {
+  const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine';
+  o.frequency.setValueAtTime(135, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.08);
+  env(g, t, 0.004, 0.34, 1.0); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.36);
+  const c = ctx.createBufferSource(); c.buffer = NB; const cf = ctx.createBiquadFilter(); cf.type = 'highpass'; cf.frequency.value = 1600;
+  const cg = ctx.createGain(); env(cg, t, 0.001, 0.02, 0.35); c.connect(cf); cf.connect(cg); cg.connect(master); c.start(t); c.stop(t + 0.03);
+}
+function sub(t, freq, dur) { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.value = freq; env(g, t, 0.02, dur, 0.5); o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + 0.05); }
+function pad(t, freqs, dur) { freqs.forEach((f, i) => { const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = (i - 1) * 7; const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 760; lp.Q.value = 0.6; const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.055, t + 0.9); g.gain.linearRampToValueAtTime(0.045, t + dur - 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + dur); o.connect(lp); lp.connect(g); g.connect(master); g.connect(verb); o.start(t); o.stop(t + dur + 0.1); }); }
+function pluck(t, freq) { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle'; o.frequency.value = freq; const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 2800; env(g, t, 0.004, 0.36, 0.13); o.connect(lp); lp.connect(g); g.connect(master); g.connect(verb); o.start(t); o.stop(t + 0.4); }
+function hat(t, open) { const s = ctx.createBufferSource(); s.buffer = NB; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7200; const g = ctx.createGain(); env(g, t, 0.001, open ? 0.13 : 0.032, open ? 0.16 : 0.13); s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + 0.16); }
+function snare(t) { const s = ctx.createBufferSource(); s.buffer = NB; const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1900; f.Q.value = 0.7; const g = ctx.createGain(); env(g, t, 0.002, 0.19, 0.26); s.connect(f); f.connect(g); g.connect(master); g.connect(verb); const o = ctx.createOscillator(), og = ctx.createGain(); o.type = 'triangle'; o.frequency.value = 195; env(og, t, 0.002, 0.1, 0.11); o.connect(og); og.connect(master); s.start(t); s.stop(t + 0.2); o.start(t); o.stop(t + 0.12); }
+
+// ── the arrangement (the conductor) ──
+const BPM = 122, SPB = 60 / BPM, STEP = SPB / 4;                       // 16th-note grid
+const CHORDS = [[73.42, 110.0, 146.83], [58.27, 87.31, 116.54], [87.31, 130.81, 174.61], [65.41, 98.0, 130.81]]; // Dm Bb F C
+const SUBROOT = [36.71, 29.14, 43.65, 32.70];
+const SCALE = [293.66, 329.63, 349.23, 392.0, 440.0, 466.16, 523.25]; // D minor (D4..C5)
+const MEL = [0, 2, 4, 3, 6, 4, 3, 2, 4, 0, 2, 4];
+// name, bars, layers (k/sn/pl/su/pd), h = hat density, panels, treatment class
+const SECTIONS = [
+  { name: 'I · INTRO',     bars: 8, k: 0, sn: 0, pl: 0, su: 0, pd: 1, h: 0, panels: 1, treat: 'dim' },
+  { name: 'II · GROOVE',   bars: 8, k: 1, sn: 0, pl: 0, su: 1, pd: 1, h: 1, panels: 2, treat: 'groove' },
+  { name: 'III · BUILD',   bars: 8, k: 1, sn: 1, pl: 1, su: 1, pd: 1, h: 2, panels: 3, treat: 'build' },
+  { name: 'IV · DROP',     bars: 8, k: 1, sn: 1, pl: 1, su: 1, pd: 1, h: 2, panels: 1, treat: 'drop' },
+  { name: 'V · BREAKDOWN', bars: 8, k: 0, sn: 0, pl: 0, su: 0, pd: 1, h: 0, panels: 1, treat: 'break' },
+  { name: 'VI · CLIMAX',   bars: 8, k: 1, sn: 1, pl: 1, su: 1, pd: 1, h: 3, panels: 3, treat: 'climax' },
+];
+const SECSTEPS = SECTIONS.map((s) => s.bars * 16);
+const TOTAL = SECSTEPS.reduce((a, b) => a + b, 0);
+function sectionAt(g) { let acc = 0; for (let i = 0; i < SECTIONS.length; i++) { acc += SECSTEPS[i]; if (g < acc) return { i, local: g - (acc - SECSTEPS[i]) }; } return { i: -1, local: 0 }; }
+
+let step = 0, nextTime = 0, playing = false, secIx = -1, schedTO = 0, plk = 0;
+function scheduleStep(g, t) {
+  const at = sectionAt(g); if (at.i < 0) { finish(t); return; }
+  const sec = SECTIONS[at.i], s16 = at.local % 16, bar = Math.floor(at.local / 16), gBar = Math.floor(g / 16);
+  const ci = Math.floor(gBar / 2) % 4, chord = CHORDS[ci];
+  if (at.i !== secIx) { secIx = at.i; queueVis(t, () => enterSection(at.i)); }
+  if (sec.pd && s16 === 0 && bar % 2 === 0) pad(t, chord, SPB * 8);
+  if (sec.su && s16 === 0) sub(t, SUBROOT[ci], SPB * 4);
+  if (sec.k && (s16 === 0 || s16 === 4 || s16 === 8 || s16 === 12)) { kick(t); queueVis(t, () => onKick(sec, s16)); }
+  if (sec.sn && (s16 === 4 || s16 === 12)) snare(t);
+  if (sec.h === 1 && (s16 === 2 || s16 === 6 || s16 === 10 || s16 === 14)) hat(t, s16 === 14);
+  if (sec.h === 2 && s16 % 2 === 0) hat(t, s16 === 14);
+  if (sec.h === 3) hat(t, s16 === 15);
+  if (sec.pl && (s16 === 0 || s16 === 6 || s16 === 10 || s16 === 13)) pluck(t, SCALE[MEL[plk++ % MEL.length] % SCALE.length]);
+}
+function tick() {
+  while (nextTime < ctx.currentTime + 0.12) { scheduleStep(step, nextTime); step++; nextTime += STEP; }
+  document.getElementById('bar').style.width = Math.min(100, step / TOTAL * 100) + '%';
+  if (playing) schedTO = setTimeout(tick, 25);
+}
+function queueVis(t, fn) { setTimeout(fn, Math.max(0, (t - ctx.currentTime) * 1000)); }
+
+// ── the director (visuals in correspondence) ──
+function enterSection(i) {
+  const sec = SECTIONS[i];
+  stage.className = sec.treat;
+  document.getElementById('sec').textContent = sec.name;
+  showPanels(sec.panels);
+  cutAll(sec.treat === 'break' || sec.treat === 'dim' ? false : true, sec.treat === 'drop' ? 1.14 : sec.treat === 'climax' ? 1.08 : 1.0);
+}
+let kb = 0;
+function onKick(sec, s16) {
+  const vis = panels.filter((p) => p.el.style.display !== 'none');
+  if (sec.treat === 'drop') { if (s16 === 0) cut(vis[0], true, 1.16); else if (Math.random() < 0.5) cut(vis[0], true, 1.05); }
+  else if (sec.treat === 'climax') cut(vis[(kb++) % vis.length], true, 1.05);
+  else if (sec.treat === 'groove') { if (s16 === 0 || s16 === 8) cut(vis[(kb++) % vis.length], true, 1.03); }
+  else if (sec.treat === 'build') cut(vis[(kb++) % vis.length], true, 1.04);
+}
+let kenTO = 0;
+function finish(t) {
+  playing = false; clearTimeout(schedTO);
+  queueVis(t, () => { stage.className = 'dim'; document.getElementById('sec').textContent = '— fin —'; document.getElementById('replay').style.display = 'block'; });
+}
+
+// ── continuous correspondence: master amplitude → breath + grain ──
+function reactLoop() {
+  if (ana) {
+    ana.getByteFrequencyData(anaData);
+    let lo = 0; for (let i = 0; i < 6; i++) lo += anaData[i]; lo /= 6 * 255;         // bass energy
+    let all = 0; for (let i = 0; i < anaData.length; i++) all += anaData[i]; all /= anaData.length * 255; // overall
+    document.documentElement.style.setProperty('--amp', (lo * 1.1).toFixed(3));
+    document.documentElement.style.setProperty('--grain', (0.04 + all * 0.16).toFixed(3));
+  }
+  requestAnimationFrame(reactLoop);
+}
+requestAnimationFrame(reactLoop);
+
+// ── start ──
+const ov = document.getElementById('ov');
+async function start() {
+  ctx = new AudioContext();
+  master = ctx.createGain(); master.gain.value = 0.85;
+  comp = ctx.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 3; comp.attack.value = 0.003; comp.release.value = 0.25;
+  ana = ctx.createAnalyser(); ana.fftSize = 128; anaData = new Uint8Array(ana.frequencyBinCount);
+  master.connect(comp); comp.connect(ana); ana.connect(ctx.destination);
+  verb = ctx.createConvolver(); verb.buffer = makeIR(3.4); const rg = ctx.createGain(); rg.gain.value = 0.32; verb.connect(rg); rg.connect(comp);
+  NB = ctx.createBuffer(1, ctx.sampleRate * 0.4, ctx.sampleRate); const nd = NB.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  try { const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0); } catch (e) {}
+  await ctx.resume();
+  await manifestReady;
+  initImages();
+  step = 0; nextTime = ctx.currentTime + 0.15; secIx = -1; plk = 0; playing = true;
+  document.getElementById('replay').style.display = 'none';
+  tick();
+}
+ov.addEventListener('click', async () => { ov.classList.add('leaving'); setTimeout(() => ov.remove(), 650); await start(); });
+document.getElementById('replay').addEventListener('click', () => { if (!playing) start(); });
+document.addEventListener('pointerdown', () => { if (ctx && ctx.state === 'suspended') ctx.resume(); }, { passive: true });
+</script>
+</body>
+</html>
