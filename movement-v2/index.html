@@ -61,7 +61,7 @@ import { loadImageryManifest } from '../js/data.js';
 // ── imagery → textures ──
 const texPool = [];
 const loader = new THREE.TextureLoader();
-function loadTex(url) { return new Promise((res) => { loader.load(url, (t) => { t.colorSpace = THREE.SRGBColorSpace; t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = true; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.userData.ar = t.image.width / t.image.height; res(t); }, undefined, () => res(null)); }); }
+function loadTex(url) { return new Promise((res) => { loader.load(url, (t) => { t.colorSpace = THREE.NoColorSpace;  // sample raw — the shader composites in display space, so no linearize/crush t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = true; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.userData.ar = t.image.width / t.image.height; res(t); }, undefined, () => res(null)); }); }
 const manifestReady = loadImageryManifest().then(async (p) => { for (const u of p) { const t = await loadTex(u); if (t) texPool.push(t); } return p; }).catch(() => {});
 let recent = [];
 function pickTex() { if (!texPool.length) return null; let t, g = 0; do { t = texPool[Math.floor(Math.random() * texPool.length)]; } while (recent.includes(t) && g++ < 6); recent.push(t); if (recent.length > 5) recent.shift(); return t; }
@@ -112,7 +112,7 @@ const frag = /* glsl */`
     vec2 uv = vUv;
     // optical breath — a clean, uniform scale pulse on the low end + the kick.
     // FILL zooms in; FIT/AMBIENT ease outward so the frame never crops. No wobble.
-    float breath = (uBass*0.6 + uKick*1.0) * uBreath * 0.03;
+    float breath = (uBass*0.5 + uKick*0.6) * uBreath * 0.03;
     float hs = (uFit < 0.5) ? (1.0 - breath) : (1.0 + breath);
     uv = 0.5 + (uv-0.5)*hs;
     vec3 a = imageColor(uTexA, uv, uArA);
@@ -126,8 +126,8 @@ const frag = /* glsl */`
     // saturation
     float luma = dot(col, vec3(0.299,0.587,0.114));
     col = mix(vec3(luma), col, uSat);
-    // contrast snap — a photographic punch on the beat (baseline + kick), not a smear
-    float con = uCon + uKick*0.28;
+    // contrast snap — a soft photographic pop on the beat (baseline stays neutral at rest)
+    float con = uCon + uKick*0.12;
     col = (col - 0.5) * con + 0.5;
     // breakdown duotone — a clean ink/paper two-tone, not a chunky posterize
     if (uDuo > 0.5) {
@@ -135,10 +135,8 @@ const frag = /* glsl */`
       col = mix(vec3(0.04), vec3(0.96), smoothstep(0.14, 0.86, g));
     }
     col = clamp(col, 0.0, 1.0);
-    // fine grain + soft vignette — the print finish
-    col += (hash(uv*uRes + uTime)*2.0 - 1.0) * 0.028;
-    float vig = smoothstep(1.25, 0.5, length(vUv-0.5));
-    col *= mix(0.84, 1.0, vig);
+    // a whisper of grain — the only finish now; no vignette, no grade
+    col += (hash(uv*uRes + uTime)*2.0 - 1.0) * 0.012;
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -176,12 +174,12 @@ const SCALE=[293.66,329.63,349.23,392.0,440.0,466.16,523.25];
 const MEL=[0,2,4,3,6,4,3,2,4,0,2,4];
 // name, layers, hats, treatment params for the shader director
 const SECTIONS=[
-  { name:'I · INTRO',     bars:8, k:0,sn:0,pl:0,su:0,pd:1, h:0, sat:0.92, con:1.02, breath:0.6, duo:0, morph:0.7,  cutHard:false },
-  { name:'II · GROOVE',   bars:8, k:1,sn:0,pl:0,su:1,pd:1, h:1, sat:1.0,  con:1.06, breath:0.9, duo:0, morph:0.42, cutHard:true },
-  { name:'III · BUILD',   bars:8, k:1,sn:1,pl:1,su:1,pd:1, h:2, sat:1.04, con:1.10, breath:1.1, duo:0, morph:0.3,  cutHard:true },
-  { name:'IV · DROP',     bars:8, k:1,sn:1,pl:1,su:1,pd:1, h:2, sat:1.08, con:1.18, breath:1.4, duo:0, morph:0.09, cutHard:true },
-  { name:'V · BREAKDOWN', bars:8, k:0,sn:0,pl:0,su:0,pd:1, h:0, sat:0.0,  con:1.0,  breath:0.4, duo:1, morph:0.75, cutHard:false },
-  { name:'VI · CLIMAX',   bars:8, k:1,sn:1,pl:1,su:1,pd:1, h:3, sat:1.1,  con:1.22, breath:1.5, duo:0, morph:0.08, cutHard:true },
+  { name:'I · INTRO',     bars:8, k:0,sn:0,pl:0,su:0,pd:1, h:0, sat:1.0, con:1.0, breath:0.6, duo:0, morph:0.7,  cutHard:false },
+  { name:'II · GROOVE',   bars:8, k:1,sn:0,pl:0,su:1,pd:1, h:1, sat:1.0, con:1.0, breath:0.9, duo:0, morph:0.42, cutHard:true },
+  { name:'III · BUILD',   bars:8, k:1,sn:1,pl:1,su:1,pd:1, h:2, sat:1.0, con:1.0, breath:1.1, duo:0, morph:0.3,  cutHard:true },
+  { name:'IV · DROP',     bars:8, k:1,sn:1,pl:1,su:1,pd:1, h:2, sat:1.0, con:1.0, breath:1.4, duo:0, morph:0.09, cutHard:true },
+  { name:'V · BREAKDOWN', bars:8, k:0,sn:0,pl:0,su:0,pd:1, h:0, sat:1.0, con:1.0, breath:0.4, duo:1, morph:0.75, cutHard:false },
+  { name:'VI · CLIMAX',   bars:8, k:1,sn:1,pl:1,su:1,pd:1, h:3, sat:1.0, con:1.0, breath:1.5, duo:0, morph:0.08, cutHard:true },
 ];
 const SECSTEPS=SECTIONS.map(s=>s.bars*16), TOTAL=SECSTEPS.reduce((a,b)=>a+b,0);
 function sectionAt(g){ let acc=0; for(let i=0;i<SECTIONS.length;i++){ acc+=SECSTEPS[i]; if(g<acc) return {i, local:g-(acc-SECSTEPS[i])}; } return {i:-1,local:0}; }
