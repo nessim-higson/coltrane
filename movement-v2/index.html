@@ -24,6 +24,8 @@
   #bar { position: fixed; left: 0; bottom: 0; height: 2px; background: var(--accent); width: 0%; z-index: 6; transition: width .12s linear; }
   #back { position: fixed; left: 4vw; bottom: 3.2vh; z-index: 6; font-size: 11px; letter-spacing: 0.14em; mix-blend-mode: difference; }
   #back a { color: #fff; }
+  #fit { position: fixed; right: 4vw; bottom: 3.2vh; z-index: 6; font-size: 11px; letter-spacing: 0.14em;
+    mix-blend-mode: difference; cursor: pointer; user-select: none; }
   #replay { position: fixed; left: 50%; bottom: 5vh; transform: translateX(-50%); z-index: 7; display: none;
     font-size: 12px; letter-spacing: 0.2em; color: #fff; opacity: 0.7; cursor: pointer; border: 1px solid rgba(255,255,255,.4); padding: 10px 20px; border-radius: 30px; }
 
@@ -42,6 +44,7 @@
 <div id="hud"><div class="mark">COLTRANE <b>· V.2</b></div><div id="sec">—</div></div>
 <div id="bar"></div>
 <div id="back"><a href="../">back</a></div>
+<div id="fit">FIT · f</div>
 <div id="replay">↻ play again</div>
 <div id="ov">
   <div class="wm">MOVEMENT <b>V.2</b></div>
@@ -78,38 +81,54 @@ const uni = {
   uMix: { value: 0 }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) },
   uBass: { value: 0 }, uHigh: { value: 0 }, uKick: { value: 0 },
   uSat: { value: 1.0 }, uPost: { value: 0.0 }, uWarp: { value: 0.5 }, uChroma: { value: 0.5 }, uDissolve: { value: 0.35 },
+  uFit: { value: 1 },  // 0 FILL(cover/crop) · 1 FIT(contain on black) · 2 AMBIENT(contain over blurred fill)
 };
 const frag = /* glsl */`
   precision highp float;
   varying vec2 vUv;
   uniform sampler2D uTexA, uTexB;
-  uniform float uArA, uArB, uScrAR, uMix, uTime, uBass, uHigh, uKick, uSat, uPost, uWarp, uChroma, uDissolve;
+  uniform float uArA, uArB, uScrAR, uMix, uTime, uBass, uHigh, uKick, uSat, uPost, uWarp, uChroma, uDissolve, uFit;
   uniform vec2 uRes;
   float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
   float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
     float a=hash(i), b=hash(i+vec2(1.,0.)), c=hash(i+vec2(0.,1.)), d=hash(i+vec2(1.,1.));
     return mix(mix(a,b,f.x), mix(c,d,f.x), f.y); }
-  vec2 cover(vec2 uv, float ar){ vec2 s = uScrAR > ar ? vec2(1.0, ar/uScrAR) : vec2(uScrAR/ar, 1.0); return (uv-0.5)*s + 0.5; }
-  vec3 samp(sampler2D t, vec2 uv, float ar, float chroma){
+  vec2 coverUV(vec2 uv, float ar){ vec2 s = uScrAR > ar ? vec2(1.0, ar/uScrAR) : vec2(uScrAR/ar, 1.0); return (uv-0.5)*s + 0.5; }
+  vec2 containUV(vec2 uv, float ar){ vec2 s = uScrAR > ar ? vec2(uScrAR/ar, 1.0) : vec2(1.0, ar/uScrAR); return (uv-0.5)*s + 0.5; }
+  vec3 imageColor(sampler2D t, vec2 uv, float ar, float chroma){
     vec2 dir = uv - 0.5;
-    return vec3(
-      texture2D(t, cover(uv + dir*chroma, ar)).r,
-      texture2D(t, cover(uv, ar)).g,
-      texture2D(t, cover(uv - dir*chroma, ar)).b
-    );
+    if (uFit < 0.5){                         // FILL — cover, crop the overflow
+      return vec3(
+        texture2D(t, coverUV(uv + dir*chroma, ar)).r,
+        texture2D(t, coverUV(uv, ar)).g,
+        texture2D(t, coverUV(uv - dir*chroma, ar)).b);
+    }
+    // FIT / AMBIENT — contain, the whole image, never cropped
+    vec2 cuv = containUV(uv, ar);
+    vec3 fg = vec3(
+      texture2D(t, containUV(uv + dir*chroma, ar)).r,
+      texture2D(t, cuv).g,
+      texture2D(t, containUV(uv - dir*chroma, ar)).b);
+    vec2 fe = smoothstep(vec2(0.0), vec2(0.004), cuv) * (1.0 - smoothstep(vec2(0.996), vec2(1.0), cuv));
+    float inb = fe.x * fe.y;                  // 1 inside the image, feathered at the edge
+    vec3 bg = (uFit < 1.5) ? vec3(0.02)       // FIT — near-black field
+            : texture2D(t, coverUV(uv, ar), 5.0).rgb * 0.26;  // AMBIENT — dark blurred fill
+    return mix(bg, fg, inb);
   }
   void main(){
     vec2 uv = vUv;
-    // gentle bass/kick heave — a subtle zoom-breath, not a smear
+    // bass/kick heave — a subtle breath. FILL zooms in; FIT/AMBIENT breathe the
+    // frame outward (the image eases into the field) so it never crops.
     float heave = uBass*0.010 + uKick*0.022;
-    uv = 0.5 + (uv-0.5)*(1.0 - heave);
+    float hs = (uFit < 0.5) ? (1.0 - heave) : (1.0 + heave);
+    uv = 0.5 + (uv-0.5)*hs;
     // low-frequency domain warp — a slow drift on the surface, small
     vec2 wn = vec2(noise(uv*2.2 + uTime*0.12), noise(uv*2.2 - uTime*0.10)) - 0.5;
     uv += wn * uWarp * (0.006 + uKick*0.012);
     // chromatic split — a few pixels, opens on highs / the kick
     float chroma = (uHigh*0.0035 + uKick*0.006) * uChroma;
-    vec3 a = samp(uTexA, uv, uArA, chroma);
-    vec3 b = samp(uTexB, uv, uArB, chroma);
+    vec3 a = imageColor(uTexA, uv, uArA, chroma);
+    vec3 b = imageColor(uTexB, uv, uArB, chroma);
     // morph: a clean crossfade whose edge wobbles organically mid-transition,
     // but resolves to exactly one image at rest (edge → 0 at uMix 0 and 1)
     float n = noise(uv*3.0 + uTime*0.15);
@@ -230,6 +249,14 @@ async function start(){
   document.getElementById('replay').style.display='none';
   tick();
 }
+// ── fit toggle: FILL(crop) / FIT(uncropped, black) / AMBIENT(uncropped, blurred fill) ──
+const FITS = ['FILL','FIT','AMBIENT']; let fitMode = 1;
+const fitChip = document.getElementById('fit');
+function setFit(m){ fitMode = (m % 3 + 3) % 3; uni.uFit.value = fitMode; fitChip.textContent = FITS[fitMode] + ' · f'; }
+fitChip.addEventListener('click', (e)=>{ e.stopPropagation(); setFit(fitMode + 1); });
+addEventListener('keydown', (e)=>{ if(e.key==='f'||e.key==='F') setFit(fitMode + 1); });
+setFit(1);
+
 ov.addEventListener('click', async ()=>{ ov.classList.add('leaving'); setTimeout(()=>ov.remove(),650); await start(); });
 document.getElementById('replay').addEventListener('click', ()=>{ if(!playing) start(); });
 document.addEventListener('pointerdown', ()=>{ if(ctx && ctx.state==='suspended') ctx.resume(); }, { passive:true });

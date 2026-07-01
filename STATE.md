@@ -43,8 +43,12 @@ straight to screen — no feedback/ping-pong). The guiding rule after the first 
 - **Per-movement look** (CPU-set uniforms `uSat/uPost/uWarp/uChroma`): INTRO crisp + calm, GROOVE/BUILD
   full colour + faster cuts, DROP heavy chroma + hard cuts, **BREAKDOWN clean B&W posterize** (sat 0,
   4-level — the graphic risograph beat), CLIMAX max chroma + warp, rapid cuts. No kaleidoscope, no trails.
+- **Fit toggle** (chip bottom-right / key `F`) — **FIT** (uncropped, whole image on near-black, the
+  default), **AMBIENT** (uncropped over a dark blurred cover-fill of the same image — full-bleed, no
+  hard bars), **FILL** (cover/crop, the original full-bleed). In fit modes the bass heave breathes the
+  frame *outward* so it never crops.
 - AnalyserNode (fftSize 128) → live `uBass`/`uHigh`; kicks fire a decaying `uKick` impulse.
-- Three r0.160 from CDN; imagery as `THREE.Texture` (mipmaps + anisotropy), cover-fit in-shader by AR.
+- Three r0.160 from CDN; imagery as `THREE.Texture` (mipmaps + anisotropy), fit in-shader by AR.
 - **Verified:** full arc INTRO→…→CLIMAX, no GL/console errors; every movement stays legible + sharp.
 - First pass (v04) was rebuilt in v05 — it had `max()` feedback smear + a permanent double-exposure
   (the dissolve blend didn't resolve to one image) + posterize/desaturate mud + a psychedelic kaleido
