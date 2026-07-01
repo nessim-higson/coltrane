@@ -40,6 +40,7 @@
   #hud { position: fixed; left: 0; right: 0; top: 0; z-index: 6; padding: 3.2vmin 4vw; display: flex;
     align-items: center; justify-content: space-between; mix-blend-mode: difference; pointer-events: none; }
   #hud .mark { font-size: 12px; letter-spacing: 0.34em; font-weight: 700; }
+  #hud .mark b { color: var(--accent); }
   #sec { font-size: 12px; letter-spacing: 0.28em; font-weight: 700; opacity: 0.9; }
   #bar { position: fixed; left: 0; bottom: 0; height: 2px; background: var(--accent); width: 0%; z-index: 6;
     transition: width .12s linear; }
@@ -68,13 +69,13 @@
 </div>
 <div id="grain"></div>
 <div id="vig"></div>
-<div id="hud"><div class="mark">COLTRANE</div><div id="sec">—</div></div>
+<div id="hud"><div class="mark">COLTRANE <b>· V.a</b></div><div id="sec">—</div></div>
 <div id="bar"></div>
 <div id="back"><a href="../">back</a></div>
 <div id="replay">↻ play again</div>
 
 <div id="ov">
-  <div class="wm">MOVEMENT</div>
+  <div class="wm">MOVEMENT <b style="color:var(--accent);font-weight:800">V.a</b></div>
   <div class="pl">a piece in six movements — sound becomes image.<br>press <b>play</b>. sound on.</div>
   <div class="pl" style="opacity:.4">tap to begin</div>
 </div>

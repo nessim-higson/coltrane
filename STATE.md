@@ -11,8 +11,12 @@ the project is. When this and the code disagree, the code wins — update this.*
 UNIQLOCK V2 orchestra work, set up to keep playing with **two directions side by
 side**. Generative Web Audio, IAAH imagery, a tempo fader, mode switches.
 
-- **`movement/`** ★ — press play; a track in six movements performs itself, conducting the image
-  field (the reframe: track-as-conductor, sound→image in correspondence). *The current lead direction.*
+- **`movement-v2/`** ★ — the **shader cut** (V.2). Same six-movement track, but the DOM field is
+  replaced by one WebGL surface the music *deforms*: bass warps the pixels, highs split them chromatic,
+  images melt via a noise dissolve, the drop/climax smear into feedback light + a kaleidoscope fold.
+  *The current lead direction.*
+- **`movement/`** — the original CSS cut (V.a): six movements conduct a full-bleed CSS image field
+  (track-as-conductor, sound→image in correspondence). Kept as the reference baseline.
 - **`breathe/`** — the grid *breathes* with the music.
 - **`breathe-only/`** — the breath focused + enhanced (varied movement sources).
 - **`refine/`** — the refined collage with a **RIGID / REFRAME** switch.
@@ -24,7 +28,21 @@ side**. Generative Web Audio, IAAH imagery, a tempo fader, mode switches.
 
 ## The builds
 
-### movement/  ★ the new direction — a piece that performs itself
+### movement-v2/  ★ the shader cut (V.2) — the image is the instrument
+The **shader treatment** the V.a build was missing. Same generative six-movement track + lookahead
+scheduler, but the visual is a single **Three.js fullscreen quad + ShaderMaterial** with a **ping-pong
+feedback** buffer. The music drives the pixels directly:
+- **Bass / kick → domain-warp** — the low end noise-warps the UVs, so the image breathes and heaves.
+- **Highs / kick → chromatic split** — R/G/B sampled along diverging offsets; the drop rainbows the edges.
+- **Warp-dissolve morph** — images don't crossfade, they *melt* into each other through a noise threshold
+  (`uMix` swept 0→1; hard-cut on kicks in DROP/CLIMAX, slow melt in INTRO/BREAKDOWN).
+- **Per-movement look** (CPU-set uniforms): INTRO/BREAKDOWN posterize + desaturate (graphic, few tones),
+  GROOVE/BUILD full colour, DROP heavy **feedback trails**, CLIMAX adds a **kaleidoscope fold**.
+- AnalyserNode (fftSize 128) → live `uBass`/`uHigh`; kicks fire a decaying `uKick` impulse.
+- Three r0.160 from CDN; imagery loaded as `THREE.Texture`, cover-fit in-shader by aspect uniform.
+- **Verified:** runs the full arc INTRO→…→CLIMAX, no GL/console errors; climax = kaleido + chromatic + trails.
+
+### movement/  the original cut (V.a) — a piece that performs itself
 The reframe: **the conductor is the track, not a metronome.** Press play and a developing
 generative track runs **six movements** — intro / groove / build / drop / breakdown / climax —
 and the arrangement choreographs the image field. This is "the site plays a track and the

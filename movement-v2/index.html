@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Coltrane — Movement · V.2</title>
+<style>
+  :root { --accent: #ffd23e; --black: #060606; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--black);
+    font-family: "Helvetica Neue", Helvetica, sans-serif; color: #fff; }
+  ::selection { background: var(--accent); color: #1a1500; }
+  #gl { position: fixed; inset: 0; z-index: 1; }
+  #gl canvas { display: block; width: 100%; height: 100%; }
+
+  #hud { position: fixed; left: 0; right: 0; top: 0; z-index: 6; padding: 3.2vmin 4vw; display: flex;
+    align-items: center; justify-content: space-between; mix-blend-mode: difference; pointer-events: none; }
+  #hud .mark { font-size: 12px; letter-spacing: 0.32em; font-weight: 700; }
+  #hud .mark b { color: var(--accent); }
+  #sec { font-size: 12px; letter-spacing: 0.28em; font-weight: 700; opacity: 0.9; }
+  #bar { position: fixed; left: 0; bottom: 0; height: 2px; background: var(--accent); width: 0%; z-index: 6; transition: width .12s linear; }
+  #back { position: fixed; left: 4vw; bottom: 3.2vh; z-index: 6; font-size: 11px; letter-spacing: 0.14em; mix-blend-mode: difference; }
+  #back a { color: #fff; }
+  #replay { position: fixed; left: 50%; bottom: 5vh; transform: translateX(-50%); z-index: 7; display: none;
+    font-size: 12px; letter-spacing: 0.2em; color: #fff; opacity: 0.7; cursor: pointer; border: 1px solid rgba(255,255,255,.4); padding: 10px 20px; border-radius: 30px; }
+
+  #ov { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3vmin; background: var(--black); cursor: pointer; transition: opacity .6s ease; padding: 8vw; text-align: center; }
+  #ov.leaving { opacity: 0; pointer-events: none; }
+  #ov .wm { font-size: 9vmin; font-weight: 800; letter-spacing: 0.02em; }
+  #ov .wm b { color: var(--accent); font-weight: 800; }
+  #ov .pl { font-size: 2.4vmin; opacity: 0.55; letter-spacing: 0.12em; line-height: 1.6; max-width: 60ch; }
+  #ov .pl b { color: var(--accent); font-weight: 700; }
+  @media (max-width: 640px){ #hud .mark,#sec{font-size:11px} #ov .pl{font-size:3.6vmin} }
+</style>
+</head>
+<body>
+<div id="gl"></div>
+<div id="hud"><div class="mark">COLTRANE <b>· V.2</b></div><div id="sec">—</div></div>
+<div id="bar"></div>
+<div id="back"><a href="../">back</a></div>
+<div id="replay">↻ play again</div>
+<div id="ov">
+  <div class="wm">MOVEMENT <b>V.2</b></div>
+  <div class="pl">the shader cut. a piece in six movements — the track deforms the image itself:
+  bass warps it, highs split it, one image melts into the next, the peaks smear into light.<br>press <b>play</b>. sound on.</div>
+  <div class="pl" style="opacity:.4">tap to begin</div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import { loadImageryManifest } from '../js/data.js';
+
+// ── imagery → textures ──
+const texPool = [];
+const loader = new THREE.TextureLoader();
+function loadTex(url) { return new Promise((res) => { loader.load(url, (t) => { t.colorSpace = THREE.SRGBColorSpace; t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.userData.ar = t.image.width / t.image.height; res(t); }, undefined, () => res(null)); }); }
+const manifestReady = loadImageryManifest().then(async (p) => { for (const u of p) { const t = await loadTex(u); if (t) texPool.push(t); } return p; }).catch(() => {});
+let recent = [];
+function pickTex() { if (!texPool.length) return null; let t, g = 0; do { t = texPool[Math.floor(Math.random() * texPool.length)]; } while (recent.includes(t) && g++ < 6); recent.push(t); if (recent.length > 5) recent.shift(); return t; }
+
+// ── three: fullscreen quad + ping-pong feedback ──
+const glDiv = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio || 1));
+renderer.setSize(innerWidth, innerHeight);
+glDiv.appendChild(renderer.domElement);
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const quad = new THREE.PlaneGeometry(2, 2);
+let rtOpts = { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false, stencilBuffer: false };
+let rtA = new THREE.WebGLRenderTarget(innerWidth, innerHeight, rtOpts);
+let rtB = new THREE.WebGLRenderTarget(innerWidth, innerHeight, rtOpts);
+
+const uni = {
+  uTexA: { value: null }, uTexB: { value: null }, uPrev: { value: null },
+  uArA: { value: 1.5 }, uArB: { value: 1.5 }, uScrAR: { value: innerWidth / innerHeight },
+  uMix: { value: 0 }, uTime: { value: 0 }, uRes: { value: new THREE.Vector2(innerWidth, innerHeight) },
+  uBass: { value: 0 }, uHigh: { value: 0 }, uKick: { value: 0 },
+  uFeedback: { value: 0.0 }, uSat: { value: 1.0 }, uPost: { value: 0.0 }, uWarp: { value: 0.6 }, uChroma: { value: 0.5 }, uKaleido: { value: 0.0 },
+};
+const frag = /* glsl */`
+  precision highp float;
+  varying vec2 vUv;
+  uniform sampler2D uTexA, uTexB, uPrev;
+  uniform float uArA, uArB, uScrAR, uMix, uTime, uBass, uHigh, uKick, uFeedback, uSat, uPost, uWarp, uChroma, uKaleido;
+  uniform vec2 uRes;
+  float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+  float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+    float a=hash(i), b=hash(i+vec2(1.,0.)), c=hash(i+vec2(0.,1.)), d=hash(i+vec2(1.,1.));
+    return mix(mix(a,b,f.x), mix(c,d,f.x), f.y); }
+  vec2 cover(vec2 uv, float ar){ vec2 s = uScrAR > ar ? vec2(1.0, ar/uScrAR) : vec2(uScrAR/ar, 1.0); return (uv-0.5)*s + 0.5; }
+  vec3 samp(sampler2D t, vec2 uv, float ar, float chroma){
+    vec2 d = (uv-0.5);
+    vec3 c;
+    c.r = texture2D(t, cover(uv + d*chroma, ar)).r;
+    c.g = texture2D(t, cover(uv, ar)).g;
+    c.b = texture2D(t, cover(uv - d*chroma, ar)).b;
+    return c;
+  }
+  void main(){
+    vec2 uv = vUv;
+    // kaleido fold at the peaks
+    vec2 kuv = abs(mod(uv*2.0, 2.0) - 1.0);
+    uv = mix(uv, kuv, uKaleido);
+    // bass / kick domain-warp — the image breathes on the low end
+    float wamt = uWarp * (uBass*0.05 + uKick*0.09);
+    vec2 w = vec2(noise(uv*3.5 + uTime*0.35), noise(uv*3.5 - uTime*0.28)) - 0.5;
+    uv += w * wamt;
+    float chroma = uChroma * (uHigh*0.010 + uKick*0.018);
+    vec3 a = samp(uTexA, uv, uArA, chroma);
+    vec3 b = samp(uTexB, uv, uArB, chroma);
+    // warp-dissolve: one image melts into the next through a noise threshold
+    float n = noise(uv*5.0 + uTime*0.12)*0.5 + 0.5;
+    float diss = smoothstep(uMix-0.28, uMix+0.28, n);
+    float m = mix(uMix, diss, 0.6);
+    vec3 col = mix(a, b, m);
+    // saturation
+    float luma = dot(col, vec3(0.299,0.587,0.114));
+    col = mix(vec3(luma), col, uSat);
+    // posterize (intro / breakdown → graphic, few tones)
+    if (uPost > 0.5) col = floor(col * uPost) / uPost;
+    // feedback trails
+    vec3 prev = texture2D(uPrev, vUv).rgb;
+    col = max(col, prev * uFeedback);
+    // grain + vignette
+    col += (hash(uv*uRes + uTime)*2.0 - 1.0) * 0.045;
+    float vig = smoothstep(1.15, 0.45, length(vUv-0.5));
+    col *= mix(0.68, 1.0, vig);
+    gl_FragColor = vec4(col, 1.0);
+  }
+`;
+const effectMat = new THREE.ShaderMaterial({ uniforms: uni, vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`, fragmentShader: frag });
+const scene = new THREE.Scene(); scene.add(new THREE.Mesh(quad, effectMat));
+const copyMat = new THREE.MeshBasicMaterial({ map: null });
+const copyScene = new THREE.Scene(); copyScene.add(new THREE.Mesh(quad, copyMat));
+
+function resize() { renderer.setSize(innerWidth, innerHeight); rtA.setSize(innerWidth, innerHeight); rtB.setSize(innerWidth, innerHeight); uni.uRes.value.set(innerWidth, innerHeight); uni.uScrAR.value = innerWidth / innerHeight; }
+addEventListener('resize', resize);
+
+// ── morph between images ──
+let morphing = false, morphDur = 0.6;
+function setImage(hard) {
+  const t = pickTex(); if (!t) return;
+  uni.uTexB.value = t; uni.uArB.value = t.userData.ar || 1.5; uni.uMix.value = 0; morphing = true; morphDur = hard ? 0.06 : 0.6;
+}
+function commitMorph() { uni.uTexA.value = uni.uTexB.value; uni.uArA.value = uni.uArB.value; uni.uMix.value = 0; morphing = false; }
+
+// ── audio (same engine as V.a) ──
+let ctx, master, verb, comp, ana, anaData, NB;
+function makeIR(sec){ const len=ctx.sampleRate*sec, b=ctx.createBuffer(2,len,ctx.sampleRate); for(let c=0;c<2;c++){ const d=b.getChannelData(c); for(let i=0;i<len;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.4);} return b; }
+function env(g,t,a,d,peak){ g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(peak,t+a); g.gain.exponentialRampToValueAtTime(0.0001,t+d); }
+function kick(t){ const o=ctx.createOscillator(),g=ctx.createGain(); o.type='sine'; o.frequency.setValueAtTime(135,t); o.frequency.exponentialRampToValueAtTime(45,t+0.08); env(g,t,0.004,0.34,1.0); o.connect(g); g.connect(master); o.start(t); o.stop(t+0.36);
+  const c=ctx.createBufferSource(); c.buffer=NB; const cf=ctx.createBiquadFilter(); cf.type='highpass'; cf.frequency.value=1600; const cg=ctx.createGain(); env(cg,t,0.001,0.02,0.35); c.connect(cf); cf.connect(cg); cg.connect(master); c.start(t); c.stop(t+0.03); }
+function sub(t,freq,dur){ const o=ctx.createOscillator(),g=ctx.createGain(); o.type='sine'; o.frequency.value=freq; env(g,t,0.02,dur,0.5); o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.05); }
+function pad(t,freqs,dur){ freqs.forEach((f,i)=>{ const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f; o.detune.value=(i-1)*7; const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=760; lp.Q.value=0.6; const g=ctx.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.055,t+0.9); g.gain.linearRampToValueAtTime(0.045,t+dur-0.6); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(lp); lp.connect(g); g.connect(master); g.connect(verb); o.start(t); o.stop(t+dur+0.1); }); }
+function pluck(t,freq){ const o=ctx.createOscillator(),g=ctx.createGain(); o.type='triangle'; o.frequency.value=freq; const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=2800; env(g,t,0.004,0.36,0.13); o.connect(lp); lp.connect(g); g.connect(master); g.connect(verb); o.start(t); o.stop(t+0.4); }
+function hat(t,open){ const s=ctx.createBufferSource(); s.buffer=NB; const f=ctx.createBiquadFilter(); f.type='highpass'; f.frequency.value=7200; const g=ctx.createGain(); env(g,t,0.001,open?0.13:0.032,open?0.16:0.13); s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t+0.16); }
+function snare(t){ const s=ctx.createBufferSource(); s.buffer=NB; const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=1900; f.Q.value=0.7; const g=ctx.createGain(); env(g,t,0.002,0.19,0.26); s.connect(f); f.connect(g); g.connect(master); g.connect(verb); const o=ctx.createOscillator(),og=ctx.createGain(); o.type='triangle'; o.frequency.value=195; env(og,t,0.002,0.1,0.11); o.connect(og); og.connect(master); s.start(t); s.stop(t+0.2); o.start(t); o.stop(t+0.12); }
+
+const BPM=122, SPB=60/BPM, STEP=SPB/4;
+const CHORDS=[[73.42,110.0,146.83],[58.27,87.31,116.54],[87.31,130.81,174.61],[65.41,98.0,130.81]];
+const SUBROOT=[36.71,29.14,43.65,32.70];
+const SCALE=[293.66,329.63,349.23,392.0,440.0,466.16,523.25];
+const MEL=[0,2,4,3,6,4,3,2,4,0,2,4];
+// name, layers, hats, treatment params for the shader director
+const SECTIONS=[
+  { name:'I · INTRO',     bars:8, k:0,sn:0,pl:0,su:0,pd:1, h:0, fb:0.0,  sat:0.45, post:5.0, warp:0.35, chroma:0.3, kal:0, morph:0.9,  cutHard:false },
+  { name:'II · GROOVE',   bars:8, k:1,sn:0,pl:0,su:1,pd:1, h:1, fb:0.12, sat:0.95, post:0.0, warp:0.6,  chroma:0.5, kal:0, morph:0.5,  cutHard:true },
+  { name:'III · BUILD',   bars:8, k:1,sn:1,pl:1,su:1,pd:1, h:2, fb:0.24, sat:1.05, post:0.0, warp:0.85, chroma:0.85,kal:0, morph:0.35, cutHard:true },
+  { name:'IV · DROP',     bars:8, k:1,sn:1,pl:1,su:1,pd:1, h:2, fb:0.55, sat:1.1,  post:0.0, warp:1.0,  chroma:1.0, kal:0, morph:0.06, cutHard:true },
+  { name:'V · BREAKDOWN', bars:8, k:0,sn:0,pl:0,su:0,pd:1, h:0, fb:0.15, sat:0.12, post:6.0, warp:0.5,  chroma:0.2, kal:0, morph:1.0,  cutHard:false },
+  { name:'VI · CLIMAX',   bars:8, k:1,sn:1,pl:1,su:1,pd:1, h:3, fb:0.6,  sat:1.1,  post:0.0, warp:1.15, chroma:1.2, kal:1, morph:0.1,  cutHard:true },
+];
+const SECSTEPS=SECTIONS.map(s=>s.bars*16), TOTAL=SECSTEPS.reduce((a,b)=>a+b,0);
+function sectionAt(g){ let acc=0; for(let i=0;i<SECTIONS.length;i++){ acc+=SECSTEPS[i]; if(g<acc) return {i, local:g-(acc-SECSTEPS[i])}; } return {i:-1,local:0}; }
+let step=0, nextTime=0, playing=false, secIx=-1, schedTO=0, plk=0;
+function queueVis(t, fn){ setTimeout(fn, Math.max(0,(t-ctx.currentTime)*1000)); }
+function scheduleStep(g,t){
+  const at=sectionAt(g); if(at.i<0){ finish(t); return; }
+  const sec=SECTIONS[at.i], s16=at.local%16, bar=Math.floor(at.local/16), gBar=Math.floor(g/16), ci=Math.floor(gBar/2)%4, chord=CHORDS[ci];
+  if(at.i!==secIx){ secIx=at.i; queueVis(t, ()=>enterSection(at.i)); }
+  if(sec.pd && s16===0 && bar%2===0) pad(t, chord, SPB*8);
+  if(sec.su && s16===0) sub(t, SUBROOT[ci], SPB*4);
+  if(sec.k && (s16===0||s16===4||s16===8||s16===12)){ kick(t); queueVis(t, ()=>onKick(sec, s16)); }
+  if(sec.sn && (s16===4||s16===12)) snare(t);
+  if(sec.h===1 && (s16===2||s16===6||s16===10||s16===14)) hat(t, s16===14);
+  if(sec.h===2 && s16%2===0) hat(t, s16===14);
+  if(sec.h===3) hat(t, s16===15);
+  if(sec.pl && (s16===0||s16===6||s16===10||s16===13)) pluck(t, SCALE[MEL[plk++%MEL.length]%SCALE.length]);
+}
+function tick(){ while(nextTime < ctx.currentTime + 0.12){ scheduleStep(step, nextTime); step++; nextTime+=STEP; } document.getElementById('bar').style.width=Math.min(100, step/TOTAL*100)+'%'; if(playing) schedTO=setTimeout(tick,25); }
+
+// ── director → shader params ──
+function setParams(s, instant){ ['fb','sat','post','warp','chroma','kal'].forEach(()=>{}); const map={fb:'uFeedback',sat:'uSat',post:'uPost',warp:'uWarp',chroma:'uChroma',kal:'uKaleido'}; for(const k in map){ uni[map[k]].value = s[k]; } }
+function enterSection(i){ const s=SECTIONS[i]; setParams(s); document.getElementById('sec').textContent=s.name; setImage(!s.cutHard ? false : false); }
+let kb=0;
+function onKick(sec, s16){ uni.uKick.value = 1.0; const s=SECTIONS.find(x=>x.name===sec.name);
+  if(sec.name.includes('DROP')){ if(s16===0) setImage(true); else if(Math.random()<0.5) setImage(true); }
+  else if(sec.name.includes('CLIMAX')) setImage(true);
+  else if(sec.name.includes('GROOVE')){ if(s16===0||s16===8) setImage(true); }
+  else if(sec.name.includes('BUILD')) setImage(true);
+  morphDur = sec.morph;
+}
+function finish(t){ playing=false; clearTimeout(schedTO); queueVis(t, ()=>{ setParams(SECTIONS[0]); document.getElementById('sec').textContent='— fin —'; document.getElementById('replay').style.display='block'; }); }
+
+// ── render loop ──
+let lastT = 0;
+function frame(now){
+  const dt = Math.min(0.05, (now - lastT)/1000 || 0.016); lastT = now;
+  uni.uTime.value += dt;
+  uni.uKick.value *= 0.86;
+  if(ana){ ana.getByteFrequencyData(anaData); let lo=0; for(let i=0;i<6;i++) lo+=anaData[i]; lo/=6*255; let hi=0; for(let i=anaData.length-16;i<anaData.length;i++) hi+=anaData[i]; hi/=16*255; uni.uBass.value += (lo-uni.uBass.value)*0.4; uni.uHigh.value += (hi-uni.uHigh.value)*0.5; }
+  if(morphing){ uni.uMix.value += dt/morphDur; if(uni.uMix.value>=1) commitMorph(); }
+  // ping-pong feedback
+  uni.uPrev.value = rtA.texture;
+  renderer.setRenderTarget(rtB); renderer.render(scene, cam);
+  copyMat.map = rtB.texture; renderer.setRenderTarget(null); renderer.render(copyScene, cam);
+  const tmp = rtA; rtA = rtB; rtB = tmp;
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ── start ──
+const ov = document.getElementById('ov');
+async function start(){
+  ctx = new AudioContext();
+  master = ctx.createGain(); master.gain.value=0.85;
+  comp = ctx.createDynamicsCompressor(); comp.threshold.value=-14; comp.ratio.value=3; comp.attack.value=0.003; comp.release.value=0.25;
+  ana = ctx.createAnalyser(); ana.fftSize=128; anaData=new Uint8Array(ana.frequencyBinCount);
+  master.connect(comp); comp.connect(ana); ana.connect(ctx.destination);
+  verb = ctx.createConvolver(); verb.buffer=makeIR(3.4); const rg=ctx.createGain(); rg.gain.value=0.32; verb.connect(rg); rg.connect(comp);
+  NB = ctx.createBuffer(1, ctx.sampleRate*0.4, ctx.sampleRate); const nd=NB.getChannelData(0); for(let i=0;i<nd.length;i++) nd[i]=Math.random()*2-1;
+  try{ const b=ctx.createBuffer(1,1,22050), s=ctx.createBufferSource(); s.buffer=b; s.connect(ctx.destination); s.start(0);}catch(e){}
+  await ctx.resume();
+  await manifestReady;
+  // seed both textures
+  const a=pickTex(), b=pickTex(); if(a){ uni.uTexA.value=a; uni.uArA.value=a.userData.ar; } if(b){ uni.uTexB.value=b; uni.uArB.value=b.userData.ar; }
+  setParams(SECTIONS[0]);
+  step=0; nextTime=ctx.currentTime+0.15; secIx=-1; plk=0; playing=true;
+  document.getElementById('replay').style.display='none';
+  tick();
+}
+ov.addEventListener('click', async ()=>{ ov.classList.add('leaving'); setTimeout(()=>ov.remove(),650); await start(); });
+document.getElementById('replay').addEventListener('click', ()=>{ if(!playing) start(); });
+document.addEventListener('pointerdown', ()=>{ if(ctx && ctx.state==='suspended') ctx.resume(); }, { passive:true });
+</script>
+</body>
+</html>

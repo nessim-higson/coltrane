@@ -7,7 +7,7 @@ name=$1; commit=${2:-HEAD}
 [ -z "$name" ] && { echo "usage: ./snapshot.sh <name> [commit]"; exit 1; }
 dir="versions/$name"
 rm -rf "$dir"; mkdir -p "$dir"
-git archive "$commit" -- breathe refine index.html js | tar -x -C "$dir"
+git archive "$commit" -- breathe breathe-only refine movement movement-v2 index.html js | tar -x -C "$dir"
 
 # inject the asset-root override so snapshots load the live /assets pool
 python3 - "$dir" <<'EOF'
