@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>COLTRANE</title>
+<style>
+  :root { --accent: #ffd23e; --black: #0a0a0a; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--black); color: #fff; min-height: 100%;
+    font-family: "Helvetica Neue", Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+  ::selection { background: var(--accent); color: #1a1500; }
+  body { padding: 14vh 8vw; }
+  h1 { font-size: 13px; letter-spacing: 0.32em; font-weight: 700; }
+  .sub { margin-top: 1.4vh; font-size: 12px; letter-spacing: 0.06em; opacity: 0.45; line-height: 1.7; max-width: 56ch; }
+  .grid { margin-top: 8vh; display: grid; gap: 0; max-width: 920px; }
+  a.card { display: block; text-decoration: none; color: #fff; padding: 4vh 0;
+    border-top: 1px solid #232323; transition: padding-left 200ms ease, color 200ms ease; }
+  a.card:hover { padding-left: 14px; color: var(--accent); }
+  a.card:last-child { border-bottom: 1px solid #232323; }
+  .t { font-size: 40px; font-weight: 700; letter-spacing: -0.01em; }
+  .d { margin-top: 1.2vh; font-size: 13px; letter-spacing: 0.03em; opacity: 0.5; line-height: 1.7; max-width: 60ch; color: #fff; }
+  a.card:hover .d { opacity: 0.7; }
+  .meta { margin-top: 1vh; font-size: 11px; letter-spacing: 0.12em; opacity: 0.3; }
+  footer { margin-top: 9vh; font-size: 11px; letter-spacing: 0.1em; opacity: 0.35; line-height: 1.8; }
+</style>
+</head>
+<body>
+  <h1>COLTRANE</h1>
+  <div class="sub">An orchestration of sound and image — forked from the UNIQLOCK&nbsp;V2 work to keep playing
+  with two directions. Generative Web Audio; sound on. Drag the tempo, switch modes up top.</div>
+
+  <div class="grid">
+    <a class="card" href="movement/">
+      <div class="t">Movement <span style="font-size:13px;letter-spacing:.14em;color:var(--accent);vertical-align:middle">NEW</span></div>
+      <div class="d">Press play and a piece performs itself. A developing track in six movements — intro,
+      groove, build, drop, breakdown, climax — conducts the image field: sections reshape the frame
+      (one image, two, three, a full-frame hit), kicks cut and punch the imagery, and the whole surface
+      breathes with the amplitude. Sound becomes image, in correspondence.</div>
+      <div class="meta">▶ PLAY · SIX MOVEMENTS</div>
+    </a>
+    <a class="card" href="breathe-only/">
+      <div class="t">Breathe — Solo</div>
+      <div class="d">The breath on its own, bigger and varied — the grid breathes with the music and the
+      movement comes from a different place each beat: a block bulges (cross), the whole grid inhales, a
+      row swells (band), or the breath travels across (wave). Toggle the sources up top to change where the
+      motion comes from.</div>
+      <div class="meta">CROSS · INHALE · BAND · WAVE</div>
+    </a>
+    <a class="card" href="breathe/">
+      <div class="t">Breathe</div>
+      <div class="d">The grid breathes with the music — on each strong beat the cells swell and settle
+      together, the whole composition pulsing in time. (Forked from uniqlock-v2 · r50.)</div>
+      <div class="meta">SUBDIVIDE · REPACK · BREATHE</div>
+    </a>
+    <a class="card" href="refine/">
+      <div class="t">Orchestra</div>
+      <div class="d">The refined collage with a RIGID&nbsp;/&nbsp;REFRAME switch — native-AR tiles that
+      relocate by fading (rigid) or morphing columns that re-roll and slide to fill the viewport (reframe).
+      The lead does the crna pull-back; a single beat is one full-screen image. (Forked from uniqlock-v2 · r66.)</div>
+      <div class="meta">SUBDIVIDE · REPACK · RIGID/REFRAME</div>
+    </a>
+  </div>
+
+  <footer>coltrane — a fork of uniqlock-v2. two builds, shared imagery + audio. play with both. · <a href="versions/" style="color:#fff">versions</a></footer>
+</body>
+</html>
