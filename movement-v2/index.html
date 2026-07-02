@@ -61,7 +61,7 @@ import { loadImageryManifest } from '../js/data.js';
 // ── imagery → textures ──
 const texPool = [];
 const loader = new THREE.TextureLoader();
-function loadTex(url) { return new Promise((res) => { loader.load(url, (t) => { t.colorSpace = THREE.NoColorSpace;  // sample raw — the shader composites in display space, so no linearize/crush t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = true; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.userData.ar = t.image.width / t.image.height; res(t); }, undefined, () => res(null)); }); }
+function loadTex(url) { return new Promise((res) => { loader.load(url, (t) => { t.colorSpace = THREE.NoColorSpace; /* sample raw — shader composites in display space, no linearize/crush */ t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter; t.generateMipmaps = true; t.anisotropy = renderer.capabilities.getMaxAnisotropy(); t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; t.userData.ar = t.image.width / t.image.height; res(t); }, undefined, () => res(null)); }); }
 const manifestReady = loadImageryManifest().then(async (p) => { for (const u of p) { const t = await loadTex(u); if (t) texPool.push(t); } return p; }).catch(() => {});
 let recent = [];
 function pickTex() { if (!texPool.length) return null; let t, g = 0; do { t = texPool[Math.floor(Math.random() * texPool.length)]; } while (recent.includes(t) && g++ < 6); recent.push(t); if (recent.length > 5) recent.shift(); return t; }
